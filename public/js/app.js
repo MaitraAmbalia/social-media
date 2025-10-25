@@ -89,6 +89,7 @@ class App {
                 if (!displayName || !headline) return alert('Please fill out all fields');
                 data = await this.api.register({ displayName, headline, email, password });
             }
+            // --- THIS IS THE CORRECTED LINE ---
             this.#handleLoginSuccess(data.user, data.token);
         } catch (err) {
             alert(`Error: ${err.message}`);
