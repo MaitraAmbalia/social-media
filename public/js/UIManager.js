@@ -137,7 +137,7 @@ export class UIManager {
             userEl.innerHTML = `
                 <div class="w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold text-xl mr-3">${user.displayName.charAt(0).toUpperCase()}</div>
                 <div>
-                    <p class.semibold">${user.displayName}</p>
+                    <p class="font-semibold">${user.displayName}</p>
                     <p class="text-sm text-gray-600">${user.headline}</p>
                 </div>`;
             this.usersList.appendChild(userEl);
@@ -198,4 +198,3 @@ export class UIManager {
         }
     }
 }
-
