@@ -11,11 +11,15 @@ class App {
 
     async init() {
         this.#addEventListeners();
+        // Load public data immediately for everyone
+        this.#loadPublicData();
+        // Check if a user is already logged in from a previous session
         await this.#checkLogin();
     }
 
     #addEventListeners() {
         // Auth Listeners
+        this.ui.loginButton.addEventListener('click', () => this.ui.showAuthModal('login'));
         this.ui.authForm.addEventListener('submit', (e) => this.#handleAuthSubmit(e));
         this.ui.authToggleButton.addEventListener('click', (e) => this.#handleAuthToggle(e));
         this.ui.logoutButton.addEventListener('click', () => this.#handleLogout());
@@ -27,10 +31,29 @@ class App {
         this.ui.postDetail.commentForm.addEventListener('submit', (e) => this.#handleCommentSubmit(e));
     }
 
+    async #loadPublicData() {
+        try {
+            this.ui.setAuthStatus('Loading posts...');
+            // These API calls are public and no longer require a token
+            const [posts, users] = await Promise.all([
+                this.api.getPosts(), 
+                this.api.getUsers()
+            ]);
+            this.ui.renderPosts(posts);
+            this.ui.renderUsers(users);
+            // Update status only if the user is not logged in
+            if (!this.currentUser) {
+                this.ui.setAuthStatus('Viewing as Guest');
+            }
+        } catch (err) {
+            this.ui.setAuthStatus(`Failed to load data: ${err.message}`, true);
+        }
+    }
+
     async #checkLogin() {
         const token = localStorage.getItem('miniLinkedInToken');
         if (!token) {
-            this.ui.showAuthModal('login');
+            this.ui.showGuestState();
             return;
         }
 
@@ -41,7 +64,7 @@ class App {
         } catch (error) {
             localStorage.removeItem('miniLinkedInToken');
             this.api.setToken(null);
-            this.ui.showAuthModal('login');
+            this.ui.showGuestState();
         }
     }
 
@@ -50,11 +73,9 @@ class App {
         this.api.setToken(token);
         localStorage.setItem('miniLinkedInToken', token);
 
-        this.ui.displayUserProfile(user);
         this.ui.hideAuthModal();
-        this.ui.showApp();
+        this.ui.showLoggedInState(user);
         this.ui.setAuthStatus('Connected');
-        this.#loadInitialData();
     }
 
     #handleLogout() {
@@ -62,9 +83,8 @@ class App {
         this.api.setToken(null);
         localStorage.removeItem('miniLinkedInToken');
         
-        this.ui.resetUIForLogout();
-        this.ui.hideApp();
-        this.ui.showAuthModal('login');
+        this.ui.showGuestState();
+        this.ui.setAuthStatus('Logged Out');
     }
 
     #handleAuthToggle(e) {
@@ -89,24 +109,9 @@ class App {
                 if (!displayName || !headline) return alert('Please fill out all fields');
                 data = await this.api.register({ displayName, headline, email, password });
             }
-            // --- THIS IS THE CORRECTED LINE ---
             this.#handleLoginSuccess(data.user, data.token);
         } catch (err) {
             alert(`Error: ${err.message}`);
-        }
-    }
-
-    // Load data *after* login
-    async #loadInitialData() {
-        try {
-            const [posts, users] = await Promise.all([
-                this.api.getPosts(), 
-                this.api.getUsers()
-            ]);
-            this.ui.renderPosts(posts);
-            this.ui.renderUsers(users);
-        } catch (err) {
-            this.ui.setAuthStatus(`Failed to load data: ${err.message}`, true);
         }
     }
     
@@ -115,15 +120,22 @@ class App {
         this.currentPostId = null;
     }
 
-    // --- Protected Actions ---
+    // --- Protected Actions (Guard Clauses) ---
 
     async #handlePostSubmit() {
+        if (!this.currentUser) {
+            alert('You must be logged in to post.');
+            this.ui.showAuthModal('login');
+            return;
+        }
+
         const content = this.ui.postContentInput.value.trim();
         if (!content) return alert('Post cannot be empty.');
         
         try {
             await this.api.createPost({ content });
             this.ui.postContentInput.value = '';
+            // Refresh posts to show the new one
             const posts = await this.api.getPosts();
             this.ui.renderPosts(posts);
         } catch (err) { alert(`Error creating post: ${err.message}`); }
@@ -137,6 +149,7 @@ class App {
         this.ui.togglePostDetailModal(true);
 
         try {
+            // These API calls are public
             const [post, comments] = await Promise.all([
                 this.api.getPost(this.currentPostId),
                 this.api.getComments(this.currentPostId)
@@ -151,6 +164,12 @@ class App {
 
     async #handleCommentSubmit(event) {
         event.preventDefault();
+        if (!this.currentUser) {
+            alert('You must be logged in to comment.');
+            this.ui.showAuthModal('login');
+            return;
+        }
+
         const content = this.ui.postDetail.commentInput.value.trim();
         if (!content) return alert('Comment cannot be empty.');
 
@@ -160,6 +179,7 @@ class App {
                 postId: this.currentPostId
             });
             this.ui.postDetail.commentInput.value = '';
+            // Refresh comments
             const comments = await this.api.getComments(this.currentPostId);
             this.ui.renderComments(comments);
         } catch (err) {
@@ -168,6 +188,7 @@ class App {
     }
 }
 
+// Start the application
 document.addEventListener('DOMContentLoaded', () => {
     const app = new App();
     app.init();

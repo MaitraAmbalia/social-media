@@ -21,12 +21,14 @@ export class UIManager {
         this.userCard = {
             name: document.getElementById('userCardName'),
             headline: document.getElementById('userCardHeadline'),
-            email: document.getElementById('userCardEmail'),
             initial: document.getElementById('userCardInitial'),
         };
+        // Toggled Buttons
+        this.loginButton = document.getElementById('loginButton');
         this.logoutButton = document.getElementById('logoutButton');
 
         // Center Feed
+        this.createPostSection = document.getElementById('createPostSection');
         this.postContentInput = document.getElementById('postContentInput');
         this.submitPostButton = document.getElementById('submitPostButton');
         this.postsFeed = document.getElementById('postsFeed');
@@ -45,7 +47,30 @@ export class UIManager {
         };
     }
 
-    // --- Auth UI Methods ---
+    // --- UI State Methods ---
+
+    showLoggedInState(user) {
+        this.loginButton.classList.add('hidden');
+        this.logoutButton.classList.remove('hidden');
+        this.createPostSection.classList.remove('hidden');
+        this.postDetail.commentForm.classList.remove('hidden');
+
+        this.userCard.name.textContent = user.displayName;
+        this.userCard.headline.textContent = user.headline;
+        this.userCard.initial.textContent = user.displayName.charAt(0).toUpperCase();
+    }
+
+    showGuestState() {
+        this.loginButton.classList.remove('hidden');
+        this.logoutButton.classList.add('hidden');
+        this.createPostSection.classList.add('hidden');
+        this.postDetail.commentForm.classList.add('hidden');
+
+        this.userCard.name.textContent = 'Guest User';
+        this.userCard.headline.textContent = 'Log in to post and comment';
+        this.userCard.initial.textContent = 'G';
+    }
+
     showAuthModal(state = 'login') {
         if (state === 'login') {
             this.authTitle.textContent = 'Log In';
@@ -68,14 +93,6 @@ export class UIManager {
     hideAuthModal() {
         this.authModal.classList.add('hidden');
     }
-
-    showApp() {
-        this.mainAppContent.classList.remove('hidden');
-    }
-
-    hideApp() {
-        this.mainAppContent.classList.add('hidden');
-    }
     
     setAuthStatus(status, isError = false) {
         this.authStatus.textContent = status;
@@ -83,22 +100,6 @@ export class UIManager {
     }
 
     // --- App Render Methods ---
-
-    displayUserProfile(user) {
-        this.userCard.name.textContent = user.displayName;
-        this.userCard.headline.textContent = user.headline;
-        this.userCard.email.textContent = user.email;
-        this.userCard.initial.textContent = user.displayName.charAt(0).toUpperCase();
-    }
-
-    resetUIForLogout() {
-        this.userCard.name.textContent = '...';
-        this.userCard.headline.textContent = '...';
-        this.userCard.email.textContent = '...';
-        this.userCard.initial.textContent = '?';
-        this.postsFeed.innerHTML = '';
-        this.usersList.innerHTML = '';
-    }
 
     renderPosts(posts) {
         this.postsFeed.innerHTML = "";
@@ -108,7 +109,7 @@ export class UIManager {
         }
         posts.forEach(post => {
             const authorName = post.author ? post.author.displayName : 'Deleted User';
-            const authorInitial = authorName.charAt(0).toUpperCase();
+            const authorInitial = authorName ? authorName.charAt(0).toUpperCase() : '?';
             const time = new Date(post.createdAt).toLocaleString();
             
             const postEl = document.createElement('div');
@@ -136,7 +137,7 @@ export class UIManager {
             userEl.innerHTML = `
                 <div class="w-10 h-10 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold text-xl mr-3">${user.displayName.charAt(0).toUpperCase()}</div>
                 <div>
-                    <p class="font-semibold">${user.displayName}</p>
+                    <p class.semibold">${user.displayName}</p>
                     <p class="text-sm text-gray-600">${user.headline}</p>
                 </div>`;
             this.usersList.appendChild(userEl);
@@ -145,7 +146,7 @@ export class UIManager {
     
     renderPostDetail(post) {
         const authorName = post.author ? post.author.displayName : 'Deleted User';
-        const authorInitial = authorName.charAt(0).toUpperCase();
+        const authorInitial = authorName ? authorName.charAt(0).toUpperCase() : '?';
         const time = new Date(post.createdAt).toLocaleString();
         
         this.postDetail.content.innerHTML = `
@@ -169,7 +170,7 @@ export class UIManager {
         }
         comments.forEach(comment => {
             const authorName = comment.author ? comment.author.displayName : 'Deleted User';
-            const authorInitial = authorName.charAt(0).toUpperCase();
+            const authorInitial = authorName ? authorName.charAt(0).toUpperCase() : '?';
             const time = new Date(comment.createdAt).toLocaleString();
             
             const commentEl = document.createElement('div');
@@ -197,3 +198,4 @@ export class UIManager {
         }
     }
 }
+
