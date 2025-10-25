@@ -1,5 +1,5 @@
-import { ApiService } from 'ApiService.js';
-import { UIManager } from 'UIManager.js';
+import { ApiService } from './ApiService.js';
+import { UIManager } from './UImanager.js';
 
 class App {
     constructor() {
@@ -12,21 +12,101 @@ class App {
     async init() {
         this.#addEventListeners();
         await this.#checkLogin();
-        this.#loadInitialData();
     }
 
     #addEventListeners() {
-        this.ui.editProfileButton.addEventListener('click', () => this.ui.toggleModal(true));
-        this.ui.modal.closeButton.addEventListener('click', () => this.ui.toggleModal(false));
-        this.ui.modal.form.addEventListener('submit', (e) => this.#handleProfileSubmit(e));
-        
-        this.ui.submitPostButton.addEventListener('click', () => this.#handlePostSubmit());
+        // Auth Listeners
+        this.ui.authForm.addEventListener('submit', (e) => this.#handleAuthSubmit(e));
+        this.ui.authToggleButton.addEventListener('click', (e) => this.#handleAuthToggle(e));
         this.ui.logoutButton.addEventListener('click', () => this.#handleLogout());
 
+        // App Listeners
+        this.ui.submitPostButton.addEventListener('click', () => this.#handlePostSubmit());
+        this.ui.postsFeed.addEventListener('click', (e) => this.#handlePostClick(e));
         this.ui.postDetail.closeButton.addEventListener('click', () => this.#closePostDetail());
         this.ui.postDetail.commentForm.addEventListener('submit', (e) => this.#handleCommentSubmit(e));
+    }
 
-        this.ui.postsFeed.addEventListener('click', (e) => this.#handlePostClick(e));
+    async #checkLogin() {
+        const token = localStorage.getItem('miniLinkedInToken');
+        if (!token) {
+            this.ui.showAuthModal('login');
+            return;
+        }
+
+        try {
+            this.api.setToken(token);
+            const user = await this.api.validateToken();
+            this.#handleLoginSuccess(user, token);
+        } catch (error) {
+            localStorage.removeItem('miniLinkedInToken');
+            this.api.setToken(null);
+            this.ui.showAuthModal('login');
+        }
+    }
+
+    #handleLoginSuccess(user, token) {
+        this.currentUser = user;
+        this.api.setToken(token);
+        localStorage.setItem('miniLinkedInToken', token);
+
+        this.ui.displayUserProfile(user);
+        this.ui.hideAuthModal();
+        this.ui.showApp();
+        this.ui.setAuthStatus('Connected');
+        this.#loadInitialData();
+    }
+
+    #handleLogout() {
+        this.currentUser = null;
+        this.api.setToken(null);
+        localStorage.removeItem('miniLinkedInToken');
+        
+        this.ui.resetUIForLogout();
+        this.ui.hideApp();
+        this.ui.showAuthModal('login');
+    }
+
+    #handleAuthToggle(e) {
+        e.preventDefault();
+        const mode = this.ui.authForm.dataset.mode;
+        this.ui.showAuthModal(mode === 'login' ? 'register' : 'login');
+    }
+
+    async #handleAuthSubmit(e) {
+        e.preventDefault();
+        const mode = this.ui.authForm.dataset.mode;
+        const email = this.ui.emailInput.value;
+        const password = this.ui.passwordInput.value;
+
+        try {
+            let data;
+            if (mode === 'login') {
+                data = await this.api.login(email, password);
+            } else {
+                const displayName = this.ui.displayNameInput.value;
+                const headline = this.ui.headlineInput.value;
+                if (!displayName || !headline) return alert('Please fill out all fields');
+                data = await this.api.register({ displayName, headline, email, password });
+            }
+            this.#handleLoginSuccess(data.user, data.token);
+        } catch (err) {
+            alert(`Error: ${err.message}`);
+        }
+    }
+
+    // Load data *after* login
+    async #loadInitialData() {
+        try {
+            const [posts, users] = await Promise.all([
+                this.api.getPosts(), 
+                this.api.getUsers()
+            ]);
+            this.ui.renderPosts(posts);
+            this.ui.renderUsers(users);
+        } catch (err) {
+            this.ui.setAuthStatus(`Failed to load data: ${err.message}`, true);
+        }
     }
     
     #closePostDetail() {
@@ -34,77 +114,18 @@ class App {
         this.currentPostId = null;
     }
 
-    async #loadInitialData() {
-        try {
-            const [posts, users] = await Promise.all([this.api.getPosts(), this.api.getUsers()]);
-            this.ui.renderPosts(posts);
-            this.ui.renderUsers(users);
-        } catch (err) {
-            this.ui.setAuthStatus(`Failed to load data: ${err.message}`, true);
-        }
-    }
+    // --- Protected Actions ---
 
-    async #checkLogin() {
-        const userId = localStorage.getItem('miniLinkedInUserId');
-        if (userId) {
-            try {
-                const user = await this.api.getUser(userId);
-                this.#setCurrentUser(user);
-            } catch (error) {
-                localStorage.removeItem('miniLinkedInUserId');
-                this.ui.setAuthStatus('Please create a profile.', true);
-                this.ui.toggleModal(true);
-                this.ui.resetUIForLogout();
-            }
-        } else {
-            this.ui.setAuthStatus('Please create a profile.');
-            this.ui.toggleModal(true);
-            this.ui.resetUIForLogout();
-        }
-    }
-    
-    #setCurrentUser(user) {
-        this.currentUser = user;
-        localStorage.setItem('miniLinkedInUserId', user._id);
-        this.ui.displayUserProfile(user);
-        this.ui.setAuthStatus('Connected');
-        this.ui.toggleModal(false);
-    }
-
-    async #handleProfileSubmit(event) {
-        event.preventDefault();
-        const userData = {
-            displayName: this.ui.modal.displayName.value,
-            headline: this.ui.modal.headline.value,
-            bio: this.ui.modal.bio.value,
-        };
-        try {
-            let user;
-            if (this.currentUser) {
-                user = await this.api.updateUser(this.currentUser._id, userData);
-            } else {
-                user = await this.api.createUser(userData);
-            }
-            this.#setCurrentUser(user);
-            const users = await this.api.getUsers();
-            this.ui.renderUsers(users);
-        } catch (err) {
-            alert(`Error saving profile: ${err.message}`);
-        }
-    }
-    
     async #handlePostSubmit() {
         const content = this.ui.postContentInput.value.trim();
         if (!content) return alert('Post cannot be empty.');
-        if (!this.currentUser) return alert('You must create a profile before posting!');
+        
         try {
-            await this.api.createPost({ content, authorId: this.currentUser._id });
+            await this.api.createPost({ content });
             this.ui.postContentInput.value = '';
             const posts = await this.api.getPosts();
             this.ui.renderPosts(posts);
-        } catch (err) {
-            alert(`Error creating post: ${err.message}`);
-        }
+        } catch (err) { alert(`Error creating post: ${err.message}`); }
     }
 
     async #handlePostClick(event) {
@@ -131,13 +152,10 @@ class App {
         event.preventDefault();
         const content = this.ui.postDetail.commentInput.value.trim();
         if (!content) return alert('Comment cannot be empty.');
-        if (!this.currentUser) return alert('You must be logged in to comment.');
-        if (!this.currentPostId) return alert('No post is selected.');
 
         try {
             await this.api.createComment({
                 content,
-                authorId: this.currentUser._id,
                 postId: this.currentPostId
             });
             this.ui.postDetail.commentInput.value = '';
@@ -146,14 +164,6 @@ class App {
         } catch (err) {
             alert(`Error posting comment: ${err.message}`);
         }
-    }
-    
-    #handleLogout() {
-        this.currentUser = null;
-        localStorage.removeItem('miniLinkedInUserId');
-        this.ui.resetUIForLogout();
-        this.ui.setAuthStatus('Please create a profile.');
-        this.ui.toggleModal(true); 
     }
 }
 

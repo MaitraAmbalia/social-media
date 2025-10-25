@@ -1,38 +1,55 @@
 export class ApiService {
     constructor() {
-        // Points to the /api folder in the same project
         this.baseURL = '/api';
+        this.token = null;
     }
 
-    // This private method is simplified to remove the '#' for broader browser support
+    setToken(token) {
+        this.token = token;
+    }
+
     async _request(endpoint, method = 'GET', body = null) {
         const config = {
             method,
             headers: { 'Content-Type': 'application/json' },
         };
+        // Send token if it exists
+        if (this.token) {
+            config.headers['x-auth-token'] = this.token;
+        }
         if (body) {
             config.body = JSON.stringify(body);
         }
+        
         const response = await fetch(`${this.baseURL}${endpoint}`, config);
+        const resData = await response.json(); // Get JSON data regardless of 'ok' status
+        
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `Error: ${response.status}`);
+            throw new Error(resData.message || `Error: ${response.status}`);
         }
-        return response.json();
+        return resData;
     }
 
-    // User Methods
+    // --- Auth Methods ---
+    register(userData) {
+        return this._request('/register', 'POST', userData);
+    }
+
+    login(email, password) {
+        return this._request('/login', 'POST', { email, password });
+    }
+
+    validateToken() {
+        return this._request('/auth/me', 'GET');
+    }
+
+    // --- App Methods ---
     getUsers() { return this._request('/users'); }
-    getUser(id) { return this._request(`/users/${id}`); }
-    createUser(userData) { return this._request('/users', 'POST', userData); }
-    updateUser(id, userData) { return this._request(`/users/${id}`, 'PUT', userData); }
     
-    // Post Methods
     getPosts() { return this._request('/posts'); }
     getPost(id) { return this._request(`/posts/${id}`); }
     createPost(postData) { return this._request('/posts', 'POST', postData); }
 
-    // Comment Methods
     getComments(postId) { return this._request(`/comments?postId=${postId}`); }
     createComment(commentData) { return this._request('/comments', 'POST', commentData); }
 }

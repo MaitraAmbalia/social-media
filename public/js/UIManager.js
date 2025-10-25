@@ -1,32 +1,40 @@
-
 export class UIManager {
     constructor() {
-        this.postsFeed = document.getElementById('postsFeed');
-        this.usersList = document.getElementById('usersList');
+        // Main App
+        this.mainAppContent = document.getElementById('mainAppContent');
         this.authStatus = document.getElementById('authStatus');
+
+        // Auth Modal
+        this.authModal = document.getElementById('authModal');
+        this.authForm = document.getElementById('authForm');
+        this.authTitle = document.getElementById('authTitle');
+        this.registerFields = document.getElementById('registerFields');
+        this.displayNameInput = document.getElementById('displayNameInput');
+        this.headlineInput = document.getElementById('headlineInput');
+        this.emailInput = document.getElementById('emailInput');
+        this.passwordInput = document.getElementById('passwordInput');
+        this.authSubmitButton = document.getElementById('authSubmitButton');
+        this.authToggleText = document.getElementById('authToggleText');
+        this.authToggleButton = document.getElementById('authToggleButton');
         
+        // Profile Card
         this.userCard = {
             name: document.getElementById('userCardName'),
             headline: document.getElementById('userCardHeadline'),
-            id: document.getElementById('userCardId'),
+            email: document.getElementById('userCardEmail'),
             initial: document.getElementById('userCardInitial'),
         };
-
-        this.modal = {
-            element: document.getElementById('profileModal'),
-            form: document.getElementById('profileForm'),
-            info: document.getElementById('modalInfo'),
-            closeButton: document.getElementById('closeModalButton'),
-            displayName: document.getElementById('displayNameInput'),
-            headline: document.getElementById('headlineInput'),
-            bio: document.getElementById('bioInput'),
-        };
-        
-        this.postContentInput = document.getElementById('postContentInput');
-        this.submitPostButton = document.getElementById('submitPostButton');
-        this.editProfileButton = document.getElementById('editProfileButton');
         this.logoutButton = document.getElementById('logoutButton');
 
+        // Center Feed
+        this.postContentInput = document.getElementById('postContentInput');
+        this.submitPostButton = document.getElementById('submitPostButton');
+        this.postsFeed = document.getElementById('postsFeed');
+
+        // Right Sidebar
+        this.usersList = document.getElementById('usersList');
+        
+        // Post Detail Modal
         this.postDetail = {
             modal: document.getElementById('postDetailModal'),
             closeButton: document.getElementById('postDetailModalCloseButton'),
@@ -36,10 +44,65 @@ export class UIManager {
             commentInput: document.getElementById('postDetailCommentInput'),
         };
     }
+
+    // --- Auth UI Methods ---
+    showAuthModal(state = 'login') {
+        if (state === 'login') {
+            this.authTitle.textContent = 'Log In';
+            this.registerFields.classList.add('hidden');
+            this.authSubmitButton.textContent = 'Log In';
+            this.authToggleText.textContent = 'Need an account?';
+            this.authToggleButton.textContent = 'Sign Up';
+            this.authForm.dataset.mode = 'login';
+        } else {
+            this.authTitle.textContent = 'Sign Up';
+            this.registerFields.classList.remove('hidden');
+            this.authSubmitButton.textContent = 'Create Account';
+            this.authToggleText.textContent = 'Already have an account?';
+            this.authToggleButton.textContent = 'Log In';
+            this.authForm.dataset.mode = 'register';
+        }
+        this.authModal.classList.remove('hidden');
+    }
+
+    hideAuthModal() {
+        this.authModal.classList.add('hidden');
+    }
+
+    showApp() {
+        this.mainAppContent.classList.remove('hidden');
+    }
+
+    hideApp() {
+        this.mainAppContent.classList.add('hidden');
+    }
     
+    setAuthStatus(status, isError = false) {
+        this.authStatus.textContent = status;
+        this.authStatus.className = isError ? 'font-semibold text-red-500' : 'font-semibold text-green-600';
+    }
+
+    // --- App Render Methods ---
+
+    displayUserProfile(user) {
+        this.userCard.name.textContent = user.displayName;
+        this.userCard.headline.textContent = user.headline;
+        this.userCard.email.textContent = user.email;
+        this.userCard.initial.textContent = user.displayName.charAt(0).toUpperCase();
+    }
+
+    resetUIForLogout() {
+        this.userCard.name.textContent = '...';
+        this.userCard.headline.textContent = '...';
+        this.userCard.email.textContent = '...';
+        this.userCard.initial.textContent = '?';
+        this.postsFeed.innerHTML = '';
+        this.usersList.innerHTML = '';
+    }
+
     renderPosts(posts) {
         this.postsFeed.innerHTML = "";
-        if (posts.length === 0) {
+        if (!posts || posts.length === 0) {
             this.postsFeed.innerHTML = `<p class="text-gray-500">No posts yet.</p>`;
             return;
         }
@@ -51,7 +114,6 @@ export class UIManager {
             const postEl = document.createElement('div');
             postEl.className = "bg-white p-4 rounded-lg shadow mb-4 cursor-pointer hover:bg-gray-50 transition-colors";
             postEl.dataset.postId = post._id;
-
             postEl.innerHTML = `
                 <div class="flex items-center mb-2 pointer-events-none">
                     <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xl mr-3">${authorInitial}</div>
@@ -67,6 +129,7 @@ export class UIManager {
 
     renderUsers(users) {
         this.usersList.innerHTML = "";
+        if (!users || users.length === 0) return;
         users.forEach(user => {
             const userEl = document.createElement('div');
             userEl.className = "flex items-center p-3 hover:bg-gray-100 rounded-lg";
@@ -78,20 +141,6 @@ export class UIManager {
                 </div>`;
             this.usersList.appendChild(userEl);
         });
-    }
-
-    displayUserProfile(user) {
-        this.userCard.name.textContent = user.displayName;
-        this.userCard.headline.textContent = user.headline;
-        this.userCard.id.textContent = `User ID: ${user._id}`;
-        this.userCard.initial.textContent = user.displayName.charAt(0).toUpperCase();
-
-        this.modal.displayName.value = user.displayName;
-        this.modal.headline.value = user.headline;
-        this.modal.bio.value = user.bio || '';
-        
-        this.editProfileButton.classList.remove('hidden');
-        this.logoutButton.classList.remove('hidden');
     }
     
     renderPostDetail(post) {
@@ -114,7 +163,7 @@ export class UIManager {
 
     renderComments(comments) {
         this.postDetail.commentsList.innerHTML = "";
-        if (comments.length === 0) {
+        if (!comments || comments.length === 0) {
             this.postDetail.commentsList.innerHTML = `<p class="text-gray-500">No comments yet.</p>`;
             return;
         }
@@ -139,10 +188,6 @@ export class UIManager {
         });
     }
 
-    toggleModal(show = true) {
-        this.modal.element.classList.toggle('hidden', !show);
-    }
-
     togglePostDetailModal(show = true) {
         this.postDetail.modal.classList.toggle('hidden', !show);
         if (!show) {
@@ -150,23 +195,5 @@ export class UIManager {
             this.postDetail.commentsList.innerHTML = "Loading...";
             this.postDetail.commentInput.value = "";
         }
-    }
-    
-    setAuthStatus(status, isError = false) {
-        this.authStatus.textContent = status;
-        this.authStatus.className = isError ? 'font-semibold text-red-500' : 'font-semibold text-green-600';
-    }
-    
-    resetUIForLogout() {
-        this.userCard.name.textContent = '...';
-        this.userCard.headline.textContent = '...';
-        this.userCard.id.textContent = 'No user loaded.';
-        this.userCard.initial.textContent = '?';
-        
-        this.editProfileButton.classList.add('hidden');
-        this.logoutButton.classList.add('hidden');
-        
-        this.modal.form.reset();
-        this.modal.info.textContent = 'Create your profile to get started.';
     }
 }
